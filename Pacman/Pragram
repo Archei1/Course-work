@@ -1,0 +1,429 @@
+#include <iostream>
+#include <SFML/Graphics.hpp>
+#include <cmath>
+
+
+//класс игрового поля
+class Board {
+public:
+    sf::Clock clock;
+    Board(sf::RenderWindow* window) {
+        this->window = window;
+    }
+    ~Board() {
+    }
+
+    void draw() {
+        sf::RectangleShape block(sf::Vector2f(BLOCK_SIZE, BLOCK_SIZE));
+        block.setFillColor(WALL_COLOR);
+        sf::CircleShape cookie(COOKIE_RADIUS);
+        cookie.setFillColor(COOKIE_COLOR);
+        sf::CircleShape supercookie(SUPERCOOKIE_RADIUS);
+        supercookie.setFillColor(COOKIE_COLOR);
+        supercookie.setOutlineColor(sf::Color::White);
+        supercookie.setOutlineThickness(2.f);
+        sf::Vector2f position(0, 0);
+        for (size_t i = 0; i < FIELD_HEIGHT; i++) {
+            for (size_t j = 0; j < FIELD_WIDTH; j++) {
+                position.x = j * BLOCK_SIZE;
+                position.y = i * BLOCK_SIZE;
+                switch (FIELD_MAZE[i * FIELD_WIDTH + j]) {
+                    case WALL_MARKER:
+                        block.setPosition(position);
+                        window->draw(block);
+                        break;
+                    case COOKIE_MARKER:
+                        cookie.setPosition(position.x + BLOCK_SIZE / 2 - COOKIE_RADIUS, position.y + BLOCK_SIZE / 2 - COOKIE_RADIUS);
+                        window->draw(cookie);
+                        break;
+                    case SUPERCOOKIE_MARKER:
+                        supercookie.setPosition(position.x + BLOCK_SIZE / 2 - SUPERCOOKIE_RADIUS, position.y + BLOCK_SIZE / 2 - SUPERCOOKIE_RADIUS);
+                        window->draw(supercookie);
+                        break;
+                }
+            }
+        }
+    }
+
+
+
+    sf::RenderWindow* window;
+    constexpr static const float BLOCK_SIZE = 32.f;
+    constexpr static const float COOKIE_RADIUS = 2.f;
+    constexpr static const float SUPERCOOKIE_RADIUS = 5.f;
+    static const char WALL_MARKER = '#';
+    static const char UNREACHABLE_MARKER = '!';
+    static const char COOKIE_MARKER = ' ';
+    static const char SUPERCOOKIE_MARKER = '$';
+    static const size_t FIELD_WIDTH = 25;
+    static const size_t FIELD_HEIGHT = 26;
+    char FIELD_MAZE[FIELD_WIDTH * FIELD_HEIGHT] = (
+            "!#######################!"
+            "!#          #          #!"
+            "!# ## ##### # ##### ## #!"
+            "!#                     #!"
+            "!# ## # ######### # ## #!"
+            "!#    #     #     #    #!"
+            "!#### ##### # ##### ####!"
+            "!!!!# #     C     # #!!!!"
+            "##### # # ##### # # #####"
+            "#       # #BPI# #       #"
+            "##### # # ##### # # #####"
+            "!!!!# #           # #!!!!"
+            "!#### # ######### # ####!"
+            "!#          #          #!"
+            "!# ## ##### # ##### ## #!"
+            "!#  #           @   #  #!"
+            "!## # # ######### # #  #!"
+            "!# $  #     #     #    #!"
+            "!# ####### ### ####### #!"
+            "!# #     #     #     # #!"
+            "!# # ### ## # ## ### # #!"
+            "!# # #      #      # # #!"
+            "!# # # #### # #### # # #!"
+            "!#          #          #!"
+            "!#######################!");
+
+    sf::Color WALL_COLOR = sf::Color(52, 93, 199);
+    sf::Color ROAD_COLOR = sf::Color(40, 40, 40);
+    sf::Color COOKIE_COLOR = sf::Color(255, 255, 255);
+private:
+};
+
+//класс игрока (пакмана)
+class Pacman {
+public:
+    Pacman(Board* board) {
+        this->board = board;
+        shape = new sf::CircleShape(PACKMAN_RADIUS);
+        shape->setFillColor(PACKMAN_COLOR);
+        for (size_t i = 0; i < board->FIELD_WIDTH; i++) {
+            for (size_t j = 0; j < board->FIELD_WIDTH; j++) {
+                if (board->FIELD_MAZE[i * board->FIELD_WIDTH + j] == '@') {
+                    shape->setPosition(j * board->BLOCK_SIZE + PACKMAN_RADIUS ,
+                                       i * board->BLOCK_SIZE + PACKMAN_RADIUS );
+                }
+            }
+        }
+        shape->setOrigin(PACKMAN_RADIUS, PACKMAN_RADIUS);
+    }
+    ~Pacman() {
+    }
+
+    void eatCookie() {
+        sf::Vector2f position = shape->getPosition();
+        int cellX = static_cast<int>(position.x / board->BLOCK_SIZE);
+        int cellY = static_cast<int>(position.y / board->BLOCK_SIZE);
+
+        // Проверяем, если текущая ячейка содержит печенье
+        if (board->FIELD_MAZE[cellY * board->FIELD_WIDTH + cellX] == ' ') {
+            // Удаляем печенье из игрового поля
+            board->FIELD_MAZE[cellY * board->FIELD_WIDTH + cellX] = '.';
+
+            // Увеличиваем счет
+            score++;
+        }
+        else if (board->FIELD_MAZE[cellY * board->FIELD_WIDTH + cellX] == '$') {
+            // Удаляем супер печенье из игрового поля
+            board->FIELD_MAZE[cellY * board->FIELD_WIDTH + cellX] = '.';
+
+            // Увеличиваем счет
+            score++;
+
+            // Активируем режим "призракового пакмана"
+            super = true;
+        }
+    }
+
+    void update() {
+        sf::Vector2f position = shape->getPosition();
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
+            direction = 1;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
+            direction = 2;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
+            direction = 3;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
+            direction = 4;
+        }
+        switch (direction) {
+            case 1:
+                velocity.y = 0;
+                velocity.x = -1;
+                break;
+            case 2:
+                velocity.y = 0;
+                velocity.x = 1;
+                break;
+            case 3:
+                velocity.x = 0;
+                velocity.y = -1;
+                break;
+            case 4:
+                velocity.x = 0;
+                velocity.y = 1;
+                break;
+        }
+        sf::Vector2f nextPosition = position + velocity * PACKMAN_SPEED * board->clock.getElapsedTime().asSeconds();
+
+        // Проверяем, не пересекает ли следующая позиция стены
+        int nextTileX = (nextPosition.x / board->BLOCK_SIZE);
+        int nextTileY = (nextPosition.y / board->BLOCK_SIZE);
+        char nextTile = board->FIELD_MAZE[nextTileY * board->FIELD_WIDTH + nextTileX];
+        if (nextTile != Board::WALL_MARKER && nextTile != Board::UNREACHABLE_MARKER) {
+            position = nextPosition;
+        }
+        shape->setPosition(position);
+
+    }
+    sf::Vector2f getPosition() const {
+        return shape->getPosition();
+    }
+    void draw() {
+        board->window->draw(*shape);
+    }
+    sf::CircleShape* shape;
+    int lives = 3;
+    bool super = false;
+    bool dead = false;
+    sf::Vector2f velocity = sf::Vector2f(0, 0);
+private:
+    sf::Color PACKMAN_COLOR = sf::Color(255, 216, 0);
+    float PACKMAN_SPEED = 120.f; // pixels per second.
+    float PACKMAN_RADIUS = 16.0f; // pixels
+    float PACKMAN_VISIBLE_RADIUS = 12.0f; // pixels
+    int direction = 0;
+    int score = 0;
+    Board* board;
+};
+
+class Ghost {
+public:
+    Ghost(Board* board, float startX, float startY) {
+        this->board = board;
+        shape = new sf::RectangleShape(sf::Vector2f(board->BLOCK_SIZE * 0.8, board->BLOCK_SIZE * 0.8));
+        shape->setFillColor(sf::Color::Red);
+        shape->setPosition(startX * board->BLOCK_SIZE + board->BLOCK_SIZE / 10,
+                           startY * board->BLOCK_SIZE + board->BLOCK_SIZE / 10);
+    }
+
+    ~Ghost() {
+    }
+
+    sf::Vector2f move() {
+        //случайное направление движения(velocity) при остановке
+        if (velocity.x == 0 && velocity.y == 0) {
+            int direction = rand() % 4 + 1;
+            switch (direction) {
+                case 1:
+                    velocity.y = 0;
+                    velocity.x = -1;
+                    break;
+                case 2:
+                    velocity.y = 0;
+                    velocity.x = 1;
+                    break;
+                case 3:
+                    velocity.x = 0;
+                    velocity.y = -1;
+                    break;
+                case 4:
+                    velocity.x = 0;
+                    velocity.y = 1;
+                    break;
+            }
+        }
+        sf::Vector2f position = shape->getPosition();
+        sf::Vector2f nextPosition = position + velocity * GHOST_SPEED * board->clock.getElapsedTime().asSeconds();
+        // Проверяем, не пересекает ли следующая позиция стены
+        size_t nextTileX = static_cast<size_t>(nextPosition.x / board->BLOCK_SIZE);
+        size_t nextTileY = static_cast<size_t>(nextPosition.y / board->BLOCK_SIZE);
+        char nextTile = board->FIELD_MAZE[nextTileY * board->FIELD_WIDTH + nextTileX];
+        if (nextTile != Board::WALL_MARKER) {
+            position = nextPosition;
+        }
+        return position;
+    }
+
+    void update() {
+        pacman->eatCookie();
+        sf::Vector2f position = shape->getPosition();
+        sf::Vector2f nextPosition = move();
+
+        // Проверяем столкновение с пакманом
+        if (nextPosition == pacman->getPosition()) {
+            if (pacman->super) {
+                shape->setPosition(position);
+            } else {
+                pacman->lives--;
+                pacman->dead = true;
+            }
+        }
+
+        // Проверяем, не пересекает ли следующая позиция стены
+        size_t nextTileX = static_cast<size_t>(nextPosition.x / board->BLOCK_SIZE);
+        size_t nextTileY = static_cast<size_t>(nextPosition.y / board->BLOCK_SIZE);
+        char nextTile = board->FIELD_MAZE[nextTileY * board->FIELD_WIDTH + nextTileX];
+        if (nextTile != Board::WALL_MARKER && nextTile != Board::UNREACHABLE_MARKER) {
+            position = nextPosition;
+        }
+        else {
+            velocity.x = -velocity.x;
+            velocity.y = -velocity.y;
+        }
+        shape->setPosition(position);
+
+
+    }
+    void draw() {
+        board->window->draw(*shape);
+    }
+    void setPacman(Pacman* p) {
+        pacman = p;
+    }
+
+    sf::RectangleShape* shape;
+    sf::Vector2f velocity = sf::Vector2f(0, 0);
+    float GHOST_SPEED = 120.f; // pixels per second.
+private:
+    Board* board;
+    Pacman* pacman;
+
+};
+
+
+class Game {
+public:
+    Game() {
+        window = new sf::RenderWindow(sf::VideoMode(800, 600), "Pacman", sf::Style::Default, sf::ContextSettings());
+        window->setFramerateLimit(60);
+        board = new Board(window);
+        pacman = new Pacman(board);
+        ghost1 = new Ghost(board, 9, 8);
+        ghost2 = new Ghost(board, 9, 9);
+        ghost3 = new Ghost(board, 10, 8);
+        ghost4 = new Ghost(board, 10, 9);
+        ghost1->setPacman(pacman);
+        ghost2->setPacman(pacman);
+        ghost3->setPacman(pacman);
+        ghost4->setPacman(pacman);
+
+        ghost1->shape->setFillColor(sf::Color::Red);
+        ghost2->shape->setFillColor(sf::Color::Blue);
+        ghost3->shape->setFillColor(sf::Color(255, 182, 193));
+        ghost4->shape->setFillColor(sf::Color::Yellow);
+        for (size_t i = 0; i < board->FIELD_WIDTH; i++) {
+            for (size_t j = 0; j < board->FIELD_WIDTH; j++) {
+                if (board->FIELD_MAZE[i * board->FIELD_WIDTH + j] == 'C') {
+                    ghost1->shape->setPosition(j * board->BLOCK_SIZE + board->BLOCK_SIZE / 10,
+                                               i * board->BLOCK_SIZE + board->BLOCK_SIZE / 10);
+                }
+            }
+        }
+        for (size_t i = 0; i < board->FIELD_WIDTH; i++) {
+            for (size_t j = 0; j < board->FIELD_WIDTH; j++) {
+                if (board->FIELD_MAZE[i * board->FIELD_WIDTH + j] == 'B') {
+                    ghost2->shape->setPosition(j * board->BLOCK_SIZE + board->BLOCK_SIZE / 10,
+                                               i * board->BLOCK_SIZE + board->BLOCK_SIZE / 10);
+                }
+            }
+        }
+        for (size_t i = 0; i < board->FIELD_WIDTH; i++) {
+            for (size_t j = 0; j < board->FIELD_WIDTH; j++) {
+                if (board->FIELD_MAZE[i * board->FIELD_WIDTH + j] == 'P') {
+                    ghost3->shape->setPosition(j * board->BLOCK_SIZE + board->BLOCK_SIZE / 10,
+                                               i * board->BLOCK_SIZE + board->BLOCK_SIZE / 10);
+                }
+            }
+        }
+        for (size_t i = 0; i < board->FIELD_WIDTH; i++) {
+            for (size_t j = 0; j < board->FIELD_WIDTH; j++) {
+                if (board->FIELD_MAZE[i * board->FIELD_WIDTH + j] == 'I') {
+                    ghost4->shape->setPosition(j * board->BLOCK_SIZE + board->BLOCK_SIZE / 10,
+                                               i * board->BLOCK_SIZE + board->BLOCK_SIZE / 10);
+                }
+            }
+        }
+    }
+    ~Game() {
+        delete pacman;
+        delete board;
+        delete window;
+    }
+
+    void run() {
+        while (window->isOpen()) {
+            handleEvents();
+            update();
+            render();
+        }
+    }
+    void update() {
+        if (!gameover) {
+            pacman->update();
+            ghost1->update();
+            ghost2->update();
+            ghost3->update();
+            ghost4->update();
+        }
+        board->clock.restart();
+
+        if (pacman->shape->getGlobalBounds().intersects(ghost1->shape->getGlobalBounds())  || pacman->shape->getGlobalBounds().intersects(ghost2->shape->getGlobalBounds()) || pacman->shape->getGlobalBounds().intersects(ghost3->shape->getGlobalBounds()) || pacman->shape->getGlobalBounds().intersects(ghost4->shape->getGlobalBounds())) {
+            pacman->dead = true;
+        }
+        if (pacman->dead) {
+            pacman->lives--;
+            pacman->dead = false;
+            for (size_t i = 0; i < board->FIELD_WIDTH; i++) {
+                for (size_t j = 0; j < board->FIELD_WIDTH; j++) {
+                    if (board->FIELD_MAZE[i * board->FIELD_WIDTH + j] == '@') {
+                        pacman->shape->setPosition(j * board->BLOCK_SIZE + board->BLOCK_SIZE / 10,
+                                                   i * board->BLOCK_SIZE + board->BLOCK_SIZE / 10);
+                    }
+                }
+            }
+        }
+        if (pacman->lives == 0) {
+            gameover = true;
+        }
+
+    }
+    void render() {
+        window->clear();
+        board->draw();
+        pacman->draw();
+        ghost1->draw();
+        ghost2->draw();
+        ghost3->draw();
+        ghost4->draw();
+        window->display();
+    }
+    void handleEvents() {
+        sf::Event event;
+        while (window->pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window->close();
+            }
+        }
+    }
+private:
+    sf::RenderWindow* window;
+    Board* board;
+    Pacman* pacman;
+    Ghost* ghost1;
+    Ghost* ghost2;
+    Ghost* ghost3;
+    Ghost* ghost4;
+    bool gameover = false;
+
+};
+
+
+int main() {
+    Game game;
+    game.run();
+    return 0;
+}
