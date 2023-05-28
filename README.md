@@ -1,6 +1,6 @@
-**Игра Пакнман на языке C++**
+## Игра Пакнман на языке C++ 
 ____
-# CMakeLists
+# Сборка
 ```
 cmake_minimum_required(VERSION 3.24.2)
 project(rpacman)
