@@ -110,6 +110,8 @@ public:
     ~Pacman() {
     }
 
+
+
     void eatCookie() {
         sf::Vector2f position = shape->getPosition();
         int cellX = static_cast<int>(position.x / board->BLOCK_SIZE);
@@ -214,38 +216,50 @@ public:
     }
 
     sf::Vector2f move() {
-        //случайное направление движения(velocity) при остановке
-        if (velocity.x == 0 && velocity.y == 0) {
-            int direction = rand() % 4 + 1;
+        int direction = rand() % 4 + 1;
+        sf::Vector2f position = shape->getPosition();
+        sf::Vector2f nextPosition = position + velocity * GHOST_SPEED * board->clock.getElapsedTime().asSeconds();
+
+
+
+        // Проверяем, есть ли препятствие или граница поля в направлении движения
+        if ((board->FIELD_MAZE[(int)(nextPosition.y / Board::BLOCK_SIZE) * Board::FIELD_WIDTH + (int)(nextPosition.x / Board::BLOCK_SIZE)] == Board::WALL_MARKER ||
+             nextPosition.x < 0 || nextPosition.x > Board::FIELD_WIDTH * Board::BLOCK_SIZE ||
+             nextPosition.y < 0 || nextPosition.y > Board::FIELD_HEIGHT * Board::BLOCK_SIZE) || (velocity.x == 0 && velocity.y == 0)) {
+            // Выбираем случайное направление движения, которое не является препятствием или границей поля
             switch (direction) {
                 case 1:
-                    velocity.y = 0;
-                    velocity.x = -1;
+                    if (board->FIELD_MAZE[(int)(position.y / Board::BLOCK_SIZE) * Board::FIELD_WIDTH + ((int)(position.x / Board::BLOCK_SIZE) - 1)] != Board::WALL_MARKER && position.x > 0) {
+                        velocity.y = 0;
+                        velocity.x = -1;
+                    }
                     break;
                 case 2:
-                    velocity.y = 0;
-                    velocity.x = 1;
+                    if (board->FIELD_MAZE[(int)(position.y / Board::BLOCK_SIZE) * Board::FIELD_WIDTH + ((int)(position.x / Board::BLOCK_SIZE) + 1)] != Board::WALL_MARKER && position.x < Board::FIELD_WIDTH * Board::BLOCK_SIZE) {
+                        velocity.y = 0;
+                        velocity.x = 1;
+                    }
                     break;
                 case 3:
-                    velocity.x = 0;
-                    velocity.y = -1;
+                    if (board->FIELD_MAZE[((int)(position.y / Board::BLOCK_SIZE) - 1) * Board::FIELD_WIDTH + (int)(position.x / Board::BLOCK_SIZE)] != Board::WALL_MARKER && position.y > 0) {
+                        velocity.x = 0;
+                        velocity.y = -1;
+                    }
                     break;
                 case 4:
-                    velocity.x = 0;
-                    velocity.y = 1;
+                    if (board->FIELD_MAZE[((int)(position.y / Board::BLOCK_SIZE) + 1) * Board::FIELD_WIDTH + (int)(position.x / Board::BLOCK_SIZE)] != Board::WALL_MARKER && position.y < Board::FIELD_HEIGHT * Board::BLOCK_SIZE) {
+                        velocity.x = 0;
+                        velocity.y = 1;
+                    }
                     break;
             }
         }
-        sf::Vector2f position = shape->getPosition();
-        sf::Vector2f nextPosition = position + velocity * GHOST_SPEED * board->clock.getElapsedTime().asSeconds();
-        // Проверяем, не пересекает ли следующая позиция стены
-        size_t nextTileX = static_cast<size_t>(nextPosition.x / board->BLOCK_SIZE);
-        size_t nextTileY = static_cast<size_t>(nextPosition.y / board->BLOCK_SIZE);
-        char nextTile = board->FIELD_MAZE[nextTileY * board->FIELD_WIDTH + nextTileX];
-        if (nextTile != Board::WALL_MARKER) {
-            position = nextPosition;
-        }
-        return position;
+
+        // Обновляем позицию приведения
+        position = shape->getPosition();
+        nextPosition = position + velocity * GHOST_SPEED * board->clock.getElapsedTime().asSeconds();
+
+        return nextPosition;
     }
 
     void update() {
@@ -293,6 +307,7 @@ private:
     Pacman* pacman;
 
 };
+
 
 
 class Game {
@@ -365,11 +380,26 @@ public:
         if (!gameover) {
             pacman->update();
             ghost1->update();
-            ghost2->update();
-            ghost3->update();
-            ghost4->update();
+            if (gameclock.getElapsedTime().asSeconds() > 5) {
+                //разблокирование комнаты с призраками
+                if (board->FIELD_MAZE[8 * board->FIELD_WIDTH + 12] == '#') {
+                    board->FIELD_MAZE[8 * board->FIELD_WIDTH + 12] = ' ';
+                    ghost2->shape->move(board->BLOCK_SIZE, 0);
+                    ghost2->shape->move(0, -board->BLOCK_SIZE);
+                    ghost3->shape->move(0, -board->BLOCK_SIZE);
+                    ghost4->shape->move(-board->BLOCK_SIZE, 0);
+                    ghost4->shape->move(0, -board->BLOCK_SIZE);
+
+                }
+                ghost2->update();
+                ghost3->update();
+                ghost4->update();
+            }
+
         }
         board->clock.restart();
+
+
 
         if (pacman->shape->getGlobalBounds().intersects(ghost1->shape->getGlobalBounds())  || pacman->shape->getGlobalBounds().intersects(ghost2->shape->getGlobalBounds()) || pacman->shape->getGlobalBounds().intersects(ghost3->shape->getGlobalBounds()) || pacman->shape->getGlobalBounds().intersects(ghost4->shape->getGlobalBounds())) {
             pacman->dead = true;
@@ -389,6 +419,7 @@ public:
         if (pacman->lives == 0) {
             gameover = true;
         }
+
 
     }
     void render() {
@@ -417,6 +448,7 @@ private:
     Ghost* ghost2;
     Ghost* ghost3;
     Ghost* ghost4;
+    sf::Clock gameclock;
     bool gameover = false;
 
 };
